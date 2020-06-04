@@ -58,7 +58,8 @@ class HasuraConnectBase implements HasuraConnect {
   @override
   bool get isConnected => _isConnected;
 
-  StreamController<bool> _isConnectedController = StreamController<bool>.broadcast();
+  StreamController<bool> _isConnectedController =
+      StreamController<bool>.broadcast();
 
   @override
   Stream<bool> get isConnectedStream => this._isConnectedController.stream;
@@ -111,7 +112,7 @@ class HasuraConnectBase implements HasuraConnect {
   @override
   Snapshot subscription(String query,
       {String key, Map<String, dynamic> variables}) {
-    if (!RegExp(r"^(?:\s+)?subscription(?:\s|\{)").hasMatch(query)]) {
+    if (!RegExp(r"^(?:\s+)?subscription(?:\s|\{)").hasMatch(query)) {
       query = 'subscription $query';
     }
 
@@ -125,10 +126,11 @@ class HasuraConnectBase implements HasuraConnect {
   @override
   Snapshot cachedQuery(String query,
       {String key, Map<String, dynamic> variables}) {
-    if (!RegExp(r"^(?:\s+)?query(?:\s|\{)").hasMatch(query)]) {
+    print("[HASURA BASE] cachedQuery");
+
+    if (query.trimLeft().split(' ')[0] != 'query') {
       query = 'query $query';
     }
-
     key = key ?? utils.generateBase(query);
 
     var jsonMap = {'query': query, 'variables': variables};
@@ -206,8 +208,8 @@ class HasuraConnectBase implements HasuraConnect {
 
   @override
   void reconnect() {
-      this._numbersOfConnectionAttempts = 0;
-      this._connect();
+    this._numbersOfConnectionAttempts = 0;
+    this._connect();
   }
 
   @override
@@ -217,13 +219,13 @@ class HasuraConnectBase implements HasuraConnect {
 
   void _connect() async {
     if (this._reconnectionAttemp != null && this._reconnectionAttemp > 0) {
-        if (this._numbersOfConnectionAttempts >= this._reconnectionAttemp) {
-          print('maximum connection attempt numbers reached');
-          this._isConnected = false;
-          this._disconnect();
-          return;
-        } 
-        this._numbersOfConnectionAttempts++;
+      if (this._numbersOfConnectionAttempts >= this._reconnectionAttemp) {
+        print('maximum connection attempt numbers reached');
+        this._isConnected = false;
+        this._disconnect();
+        return;
+      }
+      this._numbersOfConnectionAttempts++;
     }
     print('hasura connecting...');
     try {
@@ -252,6 +254,8 @@ class HasuraConnectBase implements HasuraConnect {
 
           var mutationCache = await _localStorageMutation.getAll();
           for (var key in mutationCache.keys) {
+            print("[HASURA BASE] mutationCache");
+
             await _sendPost(mutationCache[key], key);
           }
         } else if (data['type'] == 'connection_error') {
@@ -308,28 +312,36 @@ class HasuraConnectBase implements HasuraConnect {
 
   @override
   Future query(String doc, {Map<String, dynamic> variables}) async {
-    if (!RegExp(r"^(?:\s+)?query(?:\s|\{)").hasMatch(query)]) {
+    if (doc.trimLeft().split(' ')[0] != 'query') {
       doc = 'query $doc';
     }
     var jsonMap = {'query': doc, 'variables': variables};
+    print("[HASURA BASE] query");
 
     return await _sendPost(jsonMap);
   }
 
+  int times = 1;
+
   @override
   Future mutation(String doc,
       {Map<String, dynamic> variables, bool tryAgain = true}) async {
-    if (!RegExp(r"^(?:\s+)?mutation(?:\s|\{)").hasMatch(query)]) {
+    if (doc.trim().split(' ')[0] != 'mutation') {
       doc = 'mutation $doc';
     }
     var jsonMap = {'query': doc, 'variables': variables};
     var hash = utils.randomString(15);
-    await _localStorageMutation.put(hash, jsonMap);
+    if (tryAgain) await _localStorageMutation.put(hash, jsonMap);
+
+    print("[HASURA CONNECT BASE] mutation $hash ");
     return await _sendPost(jsonMap, hash);
   }
 
   Future _sendPost(Map jsonMap, [String hash]) async {
     var jsonString = jsonEncode(jsonMap);
+
+    print(jsonString);
+    print("$hash");
 
     var headersLocal = {
       'Content-type': 'application/json',
@@ -379,11 +391,4 @@ class HasuraConnectBase implements HasuraConnect {
     await _localStorageCache.close();
     await _controller.close();
   }
-
 }
-
-/*
-
-
-
-*/
